@@ -82,9 +82,10 @@ def main(argv: list[str] | None = None) -> int:
     _configure_stdio()
     args = list(sys.argv[1:] if argv is None else argv)
     if args == ["--install"]:
-        install()
-        print("已安装资源管理器右键菜单「查看占用空间」（当前用户）。")
-        print("Windows 11：右键后选「显示更多选项」，或按住 Shift 再右键。")
+        status = install()
+        print("已安装资源管理器右键菜单「查看占用空间」（当前用户注册表）。")
+        print(status)
+        print("若一级菜单没出现：右键后选「显示更多选项」，或按住 Shift 再右键。")
         return 0
     if args == ["--uninstall"]:
         uninstall()

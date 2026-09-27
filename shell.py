@@ -24,8 +24,29 @@ def _script_path() -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "app.py"))
 
 
+def _bundled_exe() -> str | None:
+    here = os.path.dirname(os.path.abspath(__file__))
+    for candidate in (
+        os.path.join(here, "dist", "foldersize", "foldersize.exe"),
+        os.path.join(here, "dist", "foldersize.exe"),
+        os.path.join(here, "foldersize.exe"),
+    ):
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
 def _command(placeholder: str) -> str:
+    exe = _bundled_exe()
+    if exe and not getattr(sys, "frozen", False):
+        return f'"{exe}" {placeholder}'
+    if getattr(sys, "frozen", False):
+        return f'"{os.path.abspath(sys.executable)}" {placeholder}'
     return f'"{_pythonw()}" "{_script_path()}" {placeholder}'
+
+
+def _icon() -> str:
+    return _bundled_exe() or _pythonw()
 
 
 def _write_verb(root_key: str, placeholder: str) -> None:
@@ -33,7 +54,7 @@ def _write_verb(root_key: str, placeholder: str) -> None:
     cmd_path = rf"{shell_path}\command"
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, shell_path) as key:
         winreg.SetValueEx(key, None, 0, winreg.REG_SZ, MENU_TEXT)
-        winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, _pythonw())
+        winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, _icon())
     with winreg.CreateKey(winreg.HKEY_CURRENT_USER, cmd_path) as key:
         winreg.SetValueEx(key, None, 0, winreg.REG_SZ, _command(placeholder))
 
@@ -64,12 +85,28 @@ def is_installed() -> bool:
         return False
 
 
-def install() -> None:
-    # %L is the long path; extra trailing space avoids the \" quoting bug on folders.
+def _menu_folder() -> str:
+    base = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+    return os.path.join(base, "FolderSize", "menu")
+
+
+def install() -> str:
+    # Classic menu stays in HKCU even when the Windows 11 top-level menu is added.
     _write_verb(r"Software\Classes\*", '"%L"')
     _write_verb(r"Software\Classes\Directory", '"%L"')
     _write_verb(r"Software\Classes\Directory\Background", '"%V"')
     _write_verb(r"Software\Classes\Drive", '"%L"')
+    folder = _menu_folder()
+    os.makedirs(folder, exist_ok=True)
+    target = _bundled_exe()
+    with open(os.path.join(folder, "target.txt"), "w", encoding="utf-8") as handle:
+        if target:
+            handle.write(target)
+        else:
+            handle.write(_pythonw() + "\n" + _script_path())
+    from win11menu import install_top_menu
+
+    return install_top_menu(folder)
 
 
 def uninstall() -> None:
@@ -77,3 +114,6 @@ def uninstall() -> None:
     _delete_tree(r"Software\Classes\Directory\Background")
     _delete_tree(r"Software\Classes\Directory")
     _delete_tree(r"Software\Classes\Drive")
+    from win11menu import remove_top_menu
+
+    remove_top_menu()

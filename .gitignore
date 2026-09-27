@@ -1,4 +1,7 @@
 __pycache__/
+build/
+dist/
+*.spec
 *.py[cod]
 *$py.class
 .venv/
